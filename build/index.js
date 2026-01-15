@@ -73270,16 +73270,31 @@ Focus on providing specific, actionable search queries and analysis approaches.`
 }
 
 // src/server/server.ts
-import { readFileSync as readFileSync2 } from "fs";
+import { readFileSync as readFileSync2, existsSync as existsSync2 } from "fs";
 import { fileURLToPath as fileURLToPath3 } from "url";
 import { dirname as dirname2, join as join4 } from "path";
 init_config();
 init_logger();
 init_zod();
-var __filename2 = fileURLToPath3(import.meta.url);
-var __dirname2 = dirname2(__filename2);
-var packageJsonPath = join4(__dirname2, "..", "..", "package.json");
-var packageJson = JSON.parse(readFileSync2(packageJsonPath, "utf8"));
+function loadPackageJson() {
+  const __filename2 = fileURLToPath3(import.meta.url);
+  const __dirname2 = dirname2(__filename2);
+  const possiblePaths = [
+    join4(__dirname2, "..", "..", "package.json"),
+    join4(__dirname2, "..", "package.json"),
+    join4(__dirname2, "package.json"),
+    join4(process.cwd(), "package.json")
+  ];
+  for (const pkgPath of possiblePaths) {
+    try {
+      if (existsSync2(pkgPath)) {
+        return JSON.parse(readFileSync2(pkgPath, "utf8"));
+      }
+    } catch (e) {}
+  }
+  return { version: "0.5.0", name: "@cedricziel/aha-mcp" };
+}
+var packageJson = loadPackageJson();
 var serverStatus = {
   status: "initializing",
   startTime: new Date,

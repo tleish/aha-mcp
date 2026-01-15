@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerResources } from "../core/resources.js";
 import { registerTools } from "../core/tools.js";
 import { registerPrompts } from "../core/prompts.js";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import * as services from "../core/services/index.js";
@@ -11,10 +11,34 @@ import { log } from "../core/logger.js";
 import { z } from "zod";
 
 // Get package.json info for server metadata
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageJsonPath = join(__dirname, "..", "..", "package.json");
-const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+// Handle both development (source) and production (bundled) paths
+function loadPackageJson(): { version: string; name: string } {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+
+  // Try multiple possible locations for package.json
+  const possiblePaths = [
+    join(__dirname, "..", "..", "package.json"),      // Development: src/server -> root
+    join(__dirname, "..", "package.json"),            // Bundled: build -> root
+    join(__dirname, "package.json"),                  // Same directory
+    join(process.cwd(), "package.json"),              // Current working directory
+  ];
+
+  for (const pkgPath of possiblePaths) {
+    try {
+      if (existsSync(pkgPath)) {
+        return JSON.parse(readFileSync(pkgPath, "utf8"));
+      }
+    } catch (e) {
+      // Continue to next path
+    }
+  }
+
+  // Fallback if package.json not found
+  return { version: "0.5.0", name: "@cedricziel/aha-mcp" };
+}
+
+const packageJson = loadPackageJson();
 
 // Server status tracking
 let serverStatus = {
