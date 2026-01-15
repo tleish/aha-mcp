@@ -2,8 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as services from "./services/index.js";
 import { databaseService } from './database/database.js';
-import { registerSyncTools } from "./tools/sync-tools.js";
-import { registerEmbeddingTools } from "./tools/embedding-tools.js";
 import { log } from "./logger.js";
 
 
@@ -970,9 +968,32 @@ export function registerTools(server: McpServer) {
     }
   );
 
-  // Register sync tools for background synchronization and observability
-  registerSyncTools(server);
-  
-  // Register embedding tools for semantic search capabilities
-  registerEmbeddingTools(server);
+  // Conditionally register sync and embedding tools if SQLite is available
+  registerOptionalTools(server);
+}
+
+/**
+ * Register optional tools that require SQLite
+ * These are loaded dynamically to avoid import errors when SQLite is not available
+ */
+async function registerOptionalTools(server: McpServer) {
+  const sqliteAvailable = await databaseService.isSqliteAvailable();
+
+  if (sqliteAvailable) {
+    try {
+      const { registerSyncTools } = await import("./tools/sync-tools.js");
+      const { registerEmbeddingTools } = await import("./tools/embedding-tools.js");
+
+      registerSyncTools(server);
+      registerEmbeddingTools(server);
+
+      log.info('SQLite available - sync and embedding tools registered');
+    } catch (error: any) {
+      log.warn('Failed to register sync/embedding tools', { error: error.message });
+    }
+  } else {
+    log.info('SQLite not available - sync and embedding tools disabled', {
+      error: databaseService.getSqliteLoadError()
+    });
+  }
 }
